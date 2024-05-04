@@ -1,0 +1,199 @@
+﻿@{
+    ViewData["Title"] = "Home Page";
+}
+
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-9 col-xl-7">
+            <div class="card rounded-3">
+                <div class="card-body p-4">
+
+                    <h4 class="text-center my-3 pb-3">To Do App</h4>
+
+                    <form id="add-task-form" class="row row-cols-lg-auto g-3 justify-content-center align-items-center mb-4 pb-2">
+                        <div class="col-12">
+                            <div class="form-outline">
+                                <input type="text" id="form1" class="form-control" name="textElement" />
+                            </div>
+                        </div>
+
+                        <div class="col-12">
+                            <button type="submit" class="btn btn-primary">Save</button>
+                        </div>
+
+                        <div class="col-12">
+                            <button type="button" id="get-tasks-btn" class="btn btn-warning">Get tasks</button>
+                        </div>
+                    </form>
+
+                    <table id="todo-list" class="table mb-4">
+                        <thead>
+                            <tr>
+                                <th scope="col">№</th>
+                                <th scope="col">Todo item</th>
+                                <th scope="col">Status</th>
+                                <th scope="col">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var toDoElement in Model)
+                            {
+                                <tr>
+                                    <th scope="row">@toDoElement.Id</th>
+                                    <td>@toDoElement.Text</td>
+                                    <td><input class="form-check-input" type="checkbox" checked="@toDoElement.Completed" onclick="return false;"></td>
+                                    <td>
+                                        <button class="btn btn-danger delete-task-btn" data-task-id="@toDoElement.Id">Delete</button>
+                                        <button class="btn btn-success ms-1 finish-task-btn" data-task-id="@toDoElement.Id">Finished</button>
+                                        <button class="btn btn-primary ms-1 edit-task-btn" data-task-id="@toDoElement.Id">Edit</button>
+                                    </td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="taskDetailsModal" tabindex="-1" aria-labelledby="taskDetailsModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="taskDetailsModalLabel">Task Details</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="taskDetailsModalBody">
+
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="editTaskModal" class="modal fade" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content">
+            <form id="edit-task-form">
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit Task</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="editedTaskText">Task Text:</label>
+                        <input type="text" class="form-control" id="editedTaskText" name="text" required>
+                        <input type="hidden" id="editedTaskId" name="id">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="submit" class="btn btn-primary">Save changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+<script>
+    $(document).ready(function() {
+        $('#add-task-form').submit(function(event) {
+            event.preventDefault();
+            var formData = $(this).serialize();
+
+            $.post("/Home/Add", formData)
+                .done(function(data) {
+                    $('#todo-list tbody').html(data); 
+                })
+                .fail(function(xhr, status, error) {
+                    console.error(xhr.responseText); 
+                    alert("Failed to add task");
+                });
+        });
+
+        $('#get-tasks-btn').click(function() {
+            var taskText = $('#form1').val();
+            $.get("/Home/GetTask", { text: taskText })
+                .done(function(data) {
+                    if (data && data.length > 0) {
+                        var taskDetailsHtml = `
+                            <div>
+                                <div>Task ID: ${data[0].id}</div>
+                                <div>Task Text: ${data[0].text}</div>
+                                <div>Task Status: ${data[0].completed ? "Completed" : "Not Completed"}</div>
+                            </div>`;
+                        $('#taskDetailsModalBody').html(taskDetailsHtml);
+                        $('#taskDetailsModal').modal('show');
+                    } else {
+                        $('#taskDetailsModalBody').html('<div>No task found.</div>');
+                        $('#taskDetailsModal').modal('show');
+                    }
+                })
+                .fail(function() {
+                    $('#taskDetailsModalBody').html('<div>Error fetching task.</div>');
+                    $('#taskDetailsModal').modal('show');
+                });
+        });
+
+        $(document).on('click', '.delete-task-btn', function(event) {
+            event.preventDefault();
+            var taskId = $(this).data('task-id');
+
+            $.get('/Home/Delete', { id: taskId })
+                .done(function() {
+                    $(event.target).closest('tr').remove();
+                })
+                .fail(function() {
+                    alert('Failed to delete task.');
+                });
+        });
+
+        $(document).on('click', '.finish-task-btn', function(event) {
+            event.preventDefault();
+            var taskId = $(this).data('task-id');
+
+            $.get('/Home/Finish', { id: taskId })
+                .done(function() {
+                    $(event.target).closest('tr').find('.form-check-input').prop('checked', true);
+                })
+                .fail(function() {
+                    alert('Failed to mark task as finished.');
+                });
+        });
+
+        $('#edit-task-form').submit(function(event) {
+            event.preventDefault();
+            var formData = $(this).serialize();
+
+            $.post("/Home/Edit", formData)
+                .done(function() {
+                    $('#editTaskModal').modal('hide');
+                    var editedTaskId = $('#editedTaskId').val(); 
+                    var editedTaskText = $('#editedTaskText').val(); 
+                    var $editedRow = $('#todo-list tbody').find('tr').filter(function() {
+                        return $(this).find('th').text() === editedTaskId; 
+                    });
+                    $editedRow.find('td:eq(0)').text(editedTaskText); 
+                })
+                .fail(function() {
+                    alert("Failed to edit task.");
+                });
+        });
+
+        $(document).on('click', '.edit-task-btn', function(event) {
+            event.preventDefault();
+            var taskId = $(this).data('task-id');
+            var taskText = $(this).closest('tr').find('td').eq(1).text(); 
+
+            $('#editedTaskId').val(taskId);
+            $('#editedTaskText').val(taskText);
+
+            $('#editTaskModal').modal('show');
+        });
+    });
+</script>
